@@ -1,0 +1,84 @@
+########################################################################################
+##                                                                                    ##
+##  README FOR THE FEATURE EXTRACTION PIPELINE FOR SENTIMENT POLARITY CLASSIFICATION  ##
+##  Created by Marjan Van de Kauter on 2014-03-21                                     ##
+##  in the framework of SemEval-2014 Task 9: Sentiment Analysis in Twitter            ##
+##                                                                                    ##
+########################################################################################
+
+
+In order to invoke the feature extraction pipeline, use the following command:
+
+python extractFeatureVectors.py workingDirectoryPath task modus inputFilePath outputFilePath featureIndexFilePath
+
+
+workingDirectoryPath
+---------------------
+
+This directory will be used to store (unfixed) dictionaries, input files for preprocessing tools, etc.
+
+Be sure to use a directory which is not used for other purposes or by other people.
+This way, the pipeline can be used by multiple users at the same time.
+However, one user (with a single working directory) can only use the pipeline for one process at a time.
+I have created a directory for each individual user under pipeline/workingDirectories , 
+but of course a personal directory in your home folder can be used as well.
+
+The working directory should contain a file features.txt , which indicates which features should be extracted.
+Each user directory under workingDirectories contains such a file (see the file itself for more info).
+
+
+task
+----
+
+Possible values: A and B (or, alternatively: a and b)
+
+Indicates the SemEval task for which the feature vectors are to be created.
+
+
+modus
+-----
+
+Possible values: train (for training data) and test (for testing data)
+
+If you run the script in train modus, dictionary files will be created in the working dictionary
+in which the token ngrams, character ngrams and dependency relations occurring in the training data 
+will be stored. When the script is subsequently run in test modus, token ngram, character ngram, 
+PMI and dependency relation features will be extracted using these dictionaries 
+(this way, these training dictionaries do not need to be recreated for each single test file).
+
+For example, if you want to create feature vectors for a training file (twitter-train-A.txt)
+and 2 test files (twitter-test-A.txt and sms-test-A.txt) for task A, 
+you will need to execute the following commands:
+
+python extractFeatureVectors.py workingDirectory a train twitter-train-A.txt twitter-train-A_fv.txt
+
+python extractFeatureVectors.py workingDirectory a test twitter-test-A.txt twitter-test-A_fv.txt
+
+python extractFeatureVectors.py workingDirectory a test sms-test-A.txt sms-test-A_fv.txt
+
+This means that the feature extraction script always needs to be run in train modus before
+it can be applied to the test files.
+Also, be sure to never delete the dictionary files created from the training data, since they
+are needed to create the feature vectors for the test data.
+
+
+inputFilePath
+-------------
+
+This file contains the instances from which the features should be extracted, in the following format:
+
+tweetID<TAB>userId<TAB>sentimentLabel<TAB>instance
+
+(see files under /var/data/lt3/proj/SemEval2014_T9/Cynthia/inputdata)
+
+
+outputFilePath
+--------------
+
+This is the file the created feature vectors will be written to.
+
+
+featureIndexFilePath
+--------------------
+
+This is the file the index number(s) for each extracted feature (set) will be written to.

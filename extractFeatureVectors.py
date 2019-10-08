@@ -2,12 +2,16 @@
 # encoding: utf-8
 
 """
-utils_els.py
+extractFeatureVectors.py
 
-Script to predict sentiment for memes based on text for SemEval 2020 task "Memotion"
+Created by Marjan Van de Kauter on 2015-01-12.
+Copyright (c) 2015 LT3. All rights reserved.
 
-Sentiment features adapted from script created by Marjan Van de Kauter on 2015-01-12.
-Copyright (c) 2019 LT3. All rights reserved.
+Created in the framework of the SentiFM project (Sentiment mining for Financial Markets)
+Based on the code created for SemEval-2014 Task 9: Sentiment Analysis in Twitter
+Creates feature vectors for sentiment polarity classification based on a given input file
+
+Takes 4 or 5 arguments:
 
 sys.argv[1] = working directory
     -> directory in which (unfixed) dictionaries and input files for preprocessing tools are stored
@@ -27,159 +31,56 @@ sys.argv[5] = feature index file (this argument is optional)
 Which features can be extracted?
 
 * Token ngram features
+* Lemma ngram features
+* Lemma + PoS tag ngram features
 * Character ngram features
+* PMI token ngram features
 * Flooding features
 * Capitalization features
 * Punctuation features
 * Hashtag features
 * Sentiment lexicon and emoticon features
+* Part-of-speech tag features
+* Named Entity features
+* Dependency relation features
 
 All feature vectors are written to the given output file path
 """
 
-from nltk.tokenize import word_tokenize
-import codecs, sys, os
-import string
-import re
-import math
-import csv
-from spacy.lang.en import English
+
+import sys
+import os
+import codecs
 import subprocess
 from Instance import Instance
 from Token import Token
 from FeatureSelection import FeatureSelection
 
 
-'task: perform classification of Memes for SemEval 2020 Memotion task'
+workingDirectory = ''
+featureFile = ''
+preproDirectory = ''
 
-def prep_task1(data_list):
-    task1_list = []
-    for item in data_list:
-        if len(item)==9:
-            temp_list = []
-            temp_list.append(item[0])
-            print (temp_list)
-            temp_list.append(item[2])
-            print (temp_list)
-            if 'positive' in item[8]:
-                temp_list.append(1)
-            if 'neutral' in item[8]:
-                temp_list.append(0)
-            if 'negative' in item[8]:
-                temp_list.append(2)
-            task1_list.append(temp_list)
-    print(task1_list)
-    return task1_list
 
-def lex_classifier(pos_words, neg_words, neutral_words, datalist):
-    correct = 0
-    incorrect = 0
-    recognized = 0
-    total_words = 0
-    
-    pos_correct = 0
-    neg_correct = 0
-    pos_incorrect = 0
-    neg_incorrect = 0
-    neutral_correct = 0
-    neutral_incorrect = 0
+def createInstanceObjectList(inputFileName):
+    '''
+    Creates a list of Instance objects from the input file, which contain all the (linguistic) information
+    needed to extract the features for sentiment polarity classification
+    '''
+    print ('Reading instances...')
+    instanceObjects = []
+    with codecs.open(inputFileName, 'r', 'utf8') as inputFile:
+    	for line in inputFile:
+            content, label = line.strip().split('\t')
+            instanceObject = Instance(content, label)
+            for i, token in enumerate(content.split()):
+                instanceObject.tokenDictionary[i+1] = Token(token)
+            if FeatureSelection.getInstance(featureFile).normalizeInstances:
+                instanceObject.tokenDictionary = instanceObject.normalizeTokens()
+            instanceObjects.append(instanceObject)
+    return instanceObjects
 
-    nlp = English()
 
-    print('Iterating through dataset')
-    for item in datalist:
-        line = item[1].lower()
-        print(line)
-        linemath = 0
-        actualmath = 0
-        data = line.strip('\n')
-        if data:
-            all_words = word_tokenize(data)
-            #print(all_words)
-            all_words_spacy = nlp(data)
-            #print(all_words_spacy)
-
-            for word in all_words:
-            #for word in all_words_spacy:
-                #if word.text in pos_words:
-                if word in pos_words:
-                    linemath+=1
-                    recognized+=1
-                if word in neg_words:
-                    linemath-=1
-                    recognized+=1
-                if word in neutral_words:
-                    recognized+=1
-
-            total_words += len(all_words)
-            if linemath!=0:
-                linemath = linemath/abs(linemath)
-            if item[2] == 1:
-                if linemath == 1:
-                    correct+=1
-                    pos_correct+=1
-                else:
-                    pos_incorrect+=1       
-                    incorrect+=1
-            if item[2] == 2:
-                if linemath == -1:
-                    correct+=1
-                    neg_correct+=1
-                else:
-                    neg_incorrect+=1
-                    incorrect+=1
-            if item[2] == 0:
-                if linemath == 0:
-                    correct+=1
-                    neutral_correct+=1
-                else:
-                    neutral_incorrect+=1
-                    incorrect+=1
-
-    total = correct + incorrect
-    acc = correct/float(total)
-    print('### LEXICON CLASSIFICATION PROCESSING SUMMARY ###')
-    print('\n ')
-    print('Classification Accuracy: {}/{} = {}'.format(correct, total, acc))
-    print('Words Recognized from Lexicon: {}/{} = {}'.format(recognized, total_words, recognized/float(total_words)))
-    print('##############################################')
-    print('\n')
-    print("Classwise Accuracies:")
-    print("Positive: {}/{} = {}".format(pos_correct, (pos_correct+pos_incorrect), pos_correct/float(pos_correct+pos_incorrect)))
-    print("Negative: {}/{} = {}".format(neg_correct, (neg_correct+neg_incorrect), neg_correct/float(neg_correct+neg_incorrect)))
-    print("Neutral: {}/{} = {}".format(neutral_correct, (neutral_correct+neutral_incorrect), neutral_correct/float(neutral_correct+neutral_incorrect)))
-
-def load_nrc_emotion_lex(lex_path):
-
-    with open(lex_path) as f:
-        content = f.readlines()
-    content = [x.strip() for x in content] 
-    
-    pos_words = []
-    neg_words = []
-    neutral_words = []
-    pos_check = 0
-    for words in content:
-        processed = words.split('\t')
-        if len(processed)==3:
-            if processed[1] == 'positive' and processed [2] == '1':
-                pos_words.append(processed[0])
-            if processed[1] == 'negative' and processed [2] == '1':
-                neg_words.append(processed[0])
-    
-    for words in content:
-        processed = words.split('\t')
-        if len(processed)==3:
-            if processed[0] not in pos_words and processed[0] not in neg_words and processed[0] not in neutral_words:
-                neutral_words.append(processed[0])
-
-    #Els: TODO add overal sentiment lexicon value
-
-    pos_words = list(set(pos_words))
-    neg_words = list(set(neg_words))
-    neutral_words = list(set(neutral_words))            
-    
-    return pos_words, neg_words, neutral_words
 
 def createTrainingLists(instanceObjectList):
     '''
@@ -188,8 +89,9 @@ def createTrainingLists(instanceObjectList):
     lemma ngram, lemma+PoStag ngram, dependency relation and PMI ngram features
     '''
     print ('Creating training dictionaries...')
-    tokenNgramFeatureRange = FeatureSelection.getInstance(featureFile).tokenNgramFeatureRange   
+    tokenNgramFeatureRange = FeatureSelection.getInstance(featureFile).tokenNgramFeatureRange	
     characterNgramFeatureRange = FeatureSelection.getInstance(featureFile).characterNgramFeatureRange
+    PMILexicons = FeatureSelection.getInstance(featureFile).PMILexicons
     trainingTokenNgrams = [[] for _ in tokenNgramFeatureRange]
     trainingTokenUnigrams = []
     trainingTokenUniBigrams = []
@@ -203,6 +105,14 @@ def createTrainingLists(instanceObjectList):
             for i, ngramList in enumerate(instanceObject.getAllCharacterNgrams(characterNgramFeatureRange)):
                 for ngram in ngramList:
                     trainingCharacterNgrams[i].append(ngram)
+        if 'nrc' in PMILexicons:
+            for ngramList in instanceObject.getTokenNgrams(range(1,3)):
+                for ngram in ngramList:
+                    trainingTokenUniBigrams.append(ngram)
+        if 'se' in PMILexicons:
+            for ngramList in instanceObject.getTokenNgrams(range(1,2)):
+                for ngram in ngramList:
+                    trainingTokenUnigrams.append(ngram)
     trainingTokenNgrams = [list(set(ngramList)) for ngramList in trainingTokenNgrams]
     trainingTokenUnigrams = list(set(trainingTokenUnigrams))
     trainingTokenUniBigrams = list(set(trainingTokenUniBigrams))
@@ -219,6 +129,24 @@ def createTrainingLists(instanceObjectList):
                 tokenNgramTrainingListFile.write('\n')
                 nr+=1
         tokenNgramTrainingListFile.close()
+    if 'nrc' in PMILexicons:
+        tokenUniBigramTrainingListFileName = os.path.join(workingDirectory, 'uniBigramList.txt')
+        if os.path.isfile(tokenUniBigramTrainingListFileName):
+            open(tokenUniBigramTrainingListFileName, 'w').close()
+        tokenUniBigramTrainingListFile = codecs.open(tokenUniBigramTrainingListFileName, 'a', 'utf8')
+        for ngram in trainingTokenUniBigrams:
+            tokenUniBigramTrainingListFile.write(ngram)
+            tokenUniBigramTrainingListFile.write('\n')
+        tokenUniBigramTrainingListFile.close()
+    if 'se' in PMILexicons:
+        tokenUnigramTrainingListFileName = os.path.join(workingDirectory, 'unigramList.txt')
+        if os.path.isfile(tokenUnigramTrainingListFileName):
+            open(tokenUnigramTrainingListFileName, 'w').close()
+        tokenUnigramTrainingListFile = codecs.open(tokenUnigramTrainingListFileName, 'a', 'utf8')
+        for ngram in trainingTokenUnigrams:
+            tokenUnigramTrainingListFile.write(ngram)
+            tokenUnigramTrainingListFile.write('\n')
+        tokenUnigramTrainingListFile.close()
     if trainingCharacterNgrams:
         characterNgramTrainingListFileName = os.path.join(workingDirectory, 'characterNgramList.txt')
         if os.path.isfile(characterNgramTrainingListFileName):
@@ -248,7 +176,12 @@ def createFeatureVectors(instanceObjectList, outputFileName, featureIndexFileNam
         featureIndexFile = open(featureIndexFileName, 'a')
     for instanceNr, instance in enumerate(instanceObjectList):
         sentimentLabel = instance.label
-
+        if sentimentLabel == '-':
+            sentimentLabel = '1'
+        if sentimentLabel == '0':
+            sentimentLabel = '2'
+        if sentimentLabel == '+':
+            sentimentLabel = '3'
         featureIndex = 0
         featureDictionary = {}
         countFloodedTokens = FeatureSelection.getInstance(featureFile).countFloodedTokens
@@ -323,40 +256,101 @@ def createFeatureVectors(instanceObjectList, outputFileName, featureIndexFileNam
                 featureIndexInfo = 'countHashtags\t%d\n' % (featureIndex)
                 if featureIndexFileName:
                     featureIndexFile.write(featureIndexInfo)
-        featureVector = str(sentimentLabel) + " " + " ".join("%d:%f" % (key, featureDictionary[key]) for key in sorted(featureDictionary.keys()))
+        sentimentLexicons = FeatureSelection.getInstance(featureFile).sentimentLexicons
+        lexiconFeatureTypes = FeatureSelection.getInstance(featureFile).lexiconFeatureTypes
+        includeHashtokenLexiconFeatures = FeatureSelection.getInstance(featureFile).includeHashtokenLexiconFeatures
+        if sentimentLexicons:
+            for lexicon in sentimentLexicons:
+                if 'postokens' in lexiconFeatureTypes and lexicon not in ["duoman","patternman"]:
+                    nrPosTokens = instance.countPositiveTokens(lexicon, False)
+                    if nrPosTokens > 0:
+                        featureDictionary[featureIndex+1] = nrPosTokens
+                    featureIndex+=1
+                    if instanceNr == 0:
+                        featureIndexInfo = '%s-nrPosToken\t%d\n' % (lexicon, featureIndex)
+                        if featureIndexFileName:
+                            featureIndexFile.write(featureIndexInfo)
+                if 'negtokens' in lexiconFeatureTypes:
+                    nrNegTokens = instance.countNegativeTokens(lexicon, False)
+                    if nrNegTokens > 0:
+	                    featureDictionary[featureIndex+1] = nrNegTokens
+                    featureIndex+=1
+                    if instanceNr == 0:
+                        featureIndexInfo = '%s-nrNegTokens\t%d\n' % (lexicon, featureIndex)
+                        if featureIndexFileName:
+                            featureIndexFile.write(featureIndexInfo)
+                if 'neuttokens' in lexiconFeatureTypes and lexicon not in ["pattern"]:
+                    nrNeutTokens = instance.countNeutralTokens(lexicon, False)
+                    if nrNeutTokens > 0:
+                        featureDictionary[featureIndex+1] = nrNeutTokens
+                    featureIndex+=1
+                    if instanceNr == 0:
+                        featureIndexInfo = '%s-nrNeutTokens\t%d\n' % (lexicon, featureIndex)
+                        if featureIndexFileName:
+                            featureIndexFile.write(featureIndexInfo)
+                if 'overallvalue' in lexiconFeatureTypes:
+                    overallValue = instance.calculatePolarityValue(lexicon, False)
+                    if overallValue != 0:
+                        featureDictionary[featureIndex+1] = overallValue
+                    featureIndex+=1
+                    if instanceNr == 0:
+                        featureIndexInfo = '%s-overallValue\t%d\n' % (lexicon, featureIndex)
+                        if featureIndexFileName:
+                            featureIndexFile.write(featureIndexInfo)
+            if includeHashtokenLexiconFeatures:
+                for lexicon in sentimentLexicons:
+                    if 'postokens' in lexiconFeatureTypes:
+                        nrPosTokens = instance.countPositiveTokens(lexicon, True)
+                        if nrPosTokens > 0:
+                            featureDictionary[featureIndex+1] = nrPosTokens
+                        featureIndex+=1
+                        if instanceNr == 0:
+                            featureIndexInfo = '%s-nrPosTokens-hashtokens\t%d\n' % (lexicon, featureIndex)
+                            if featureIndexFileName:
+                                featureIndexFile.write(featureIndexInfo)
+                    if 'negtokens' in lexiconFeatureTypes:
+                        nrNegTokens = instance.countNegativeTokens(lexicon, True)
+                        if nrNegTokens > 0:
+                            featureDictionary[featureIndex+1] = nrNegTokens
+                        featureIndex+=1
+                        if instanceNr == 0:
+                            featureIndexInfo = '%s-nrNegTokens-hashtokens\t%d\n' % (lexicon, featureIndex)
+                            if featureIndexFileName:
+                                featureIndexFile.write(featureIndexInfo)
+                    if 'neuttokens' in lexiconFeatureTypes:
+                        nrNeutTokens = instance.countNeutralTokens(lexicon, True)
+                        if nrNeutTokens > 0:
+                            featureDictionary[featureIndex+1] = nrNeutTokens
+                        featureIndex+=1
+                        if instanceNr == 0:
+                            featureIndexInfo = '%s-nrNeutTokens-hashtokens\t%d\n' % (lexicon, featureIndex)
+                            if featureIndexFileName:
+                                featureIndexFile.write(featureIndexInfo)
+                    if 'overallvalue' in lexiconFeatureTypes:
+                        overallValue = instance.calculatePolarityValue(lexicon, True)
+                        if overallValue != 0:
+                            featureDictionary[featureIndex+1] = overallValue
+                        featureIndex+=1
+                        if instanceNr == 0:
+                            featureIndexInfo = '%s-overallValue-hashtokens\t%d\n' % (lexicon, featureIndex)
+                            if featureIndexFileName:
+                                featureIndexFile.write(featureIndexInfo)
+        PMILexicons = FeatureSelection.getInstance(featureFile).PMILexicons
+        for lexicon in PMILexicons:
+            PMINgramFeatureDictionary, numberOfPMIFeatures = instance.createPMINgramFeatures(lexicon, workingDirectory)
+            for index in PMINgramFeatureDictionary:
+                featureDictionary[featureIndex+index] = PMINgramFeatureDictionary[index]
+            featureIndex+=numberOfPMIFeatures
+            if instanceNr == 0:
+                featureIndexInfo = '%s-PMIFeatures\t%d-%d\n' % (lexicon, featureIndex+1-numberOfPMIFeatures, featureIndex)
+                if featureIndexFileName:
+                    featureIndexFile.write(featureIndexInfo)
+        featureVector = sentimentLabel + " " + " ".join("%d:%f" % (key, featureDictionary[key]) for key in sorted(featureDictionary.keys()))
         outputFile.write(featureVector)
         outputFile.write('\n')
     outputFile.close()
     if featureIndexFileName:
         featureIndexFile.close()
-
-
-def createInstanceObjectList(processed_dataset):
-    '''
-    Creates a list of Instance objects from the tokenized input + label
-    '''
-    print ('Reading instances...')
-    instanceObjects = []
-
-    #Els: read in tokenised lines
-    #processed_data = []
-    for item in processed_dataset:
-        tokenized = []
-        line = item[1]
-        data = line.strip('\n')
-        if data:
-            all_words = word_tokenize(data)
-            content = ' '.join([str(elem) for elem in all_words])
-        label = item[2]
-        #processed_data.append(tokenized + '\t' + str(label))
-        instanceObject = Instance(tokenized, label)
-        for i, token in enumerate(content.split()):
-            instanceObject.tokenDictionary[i+1] = Token(token)
-        if FeatureSelection.getInstance(featureFile).normalizeInstances:
-            instanceObject.tokenDictionary = instanceObject.normalizeTokens()
-        instanceObjects.append(instanceObject)
-    return instanceObjects
-
 
 
 def main():
@@ -365,22 +359,7 @@ def main():
     global featureFile
     global preproDirectory
 
-    #Els: use small test file to test code
-    #with open('data/data_7000.csv', 'r') as f:
-    with open('data/test.csv', 'r') as f:
-        reader = csv.reader(f)
-        data_list = list(reader)
-
-    #Code Pranay for lexion lookup
-    print('Read Data From CSV...')
-    pos_words, neg_words, neutral_words = load_nrc_emotion_lex('data/NRC-Emotion-Lexicon-Wordlevel-v0.92.txt')
-    print('NRC Emotion Lexicon Loaded...')
-    processed_dataset = prep_task1(data_list)
-    print('Prepared Dataset...')
-    lex_classifier(pos_words, neg_words, neutral_words, processed_dataset)
-
- 
-    #Els: Check command Line
+    # checks if the given command line arguments are valid
     try:
         if len(sys.argv) not in [5, 6]:
             raise ValueError()
@@ -431,9 +410,7 @@ def main():
         print( "Error: working directory should contain a subdirectory prepro")
         sys.exit("Process terminated due to missing prepro directory in working directory")
 
-
-    #instanceObjectList = processed_dataset
-    instanceObjectList = createInstanceObjectList(processed_dataset)
+    instanceObjectList = createInstanceObjectList(inputFileName)
 
     if modus == 'train':
         createTrainingLists(instanceObjectList)
