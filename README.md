@@ -52,3 +52,8 @@ predict(image_path)
 
 * Train a Supervised Model Baseline using various features
 * Create a dictionary of the words in Memes and attempt to create meaningful 'memebeddings'
+
+### Integration Sentiment Features English
+
+python utils_els.py ./WorkingDir/ train ./WorkingDir/test.csv data_test_out.txt feature_index.txt
+
