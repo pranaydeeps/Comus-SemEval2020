@@ -366,8 +366,8 @@ def main():
     global preproDirectory
 
     #Els: use small test file to test code
-    #with open('data/data_7000.csv', 'r') as f:
-    with open('data/test.csv', 'r') as f:
+    with open('data/data_7000.csv', 'r') as f:
+    # with open('data/test.csv', 'r') as f:
         reader = csv.reader(f)
         data_list = list(reader)
 
@@ -376,8 +376,8 @@ def main():
     pos_words, neg_words, neutral_words = load_nrc_emotion_lex('data/NRC-Emotion-Lexicon-Wordlevel-v0.92.txt')
     print('NRC Emotion Lexicon Loaded...')
     processed_dataset = prep_task1(data_list)
-    print('Prepared Dataset...')
-    lex_classifier(pos_words, neg_words, neutral_words, processed_dataset)
+    # print('Prepared Dataset...')
+    # lex_classifier(pos_words, neg_words, neutral_words, processed_dataset)
 
  
     #Els: Check command Line

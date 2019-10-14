@@ -55,5 +55,5 @@ predict(image_path)
 
 ### Integration Sentiment Features English
 
-python utils_els.py ./WorkingDir/ train ./WorkingDir/test.csv data_test_out.txt feature_index.txt
+python utils.py ./WorkingDir/ train ./WorkingDir/test.csv data_test_out.txt feature_index.txt
 

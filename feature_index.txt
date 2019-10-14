@@ -1,9 +1,9 @@
 countFloodedTokens	1
 countCapitalizedTokens	2
 countFloodedPunctuationTokens	3
-token1gramFeatures	4-241
-token2gramFeatures	242-588
-token3gramFeatures	589-939
-character3gramFeatures	940-1423
-character4gramFeatures	1424-1841
-countHashtags	1842
+token1gramFeatures	4-13225
+token2gramFeatures	13226-66169
+token3gramFeatures	66170-138456
+character3gramFeatures	138457-148626
+character4gramFeatures	148627-171587
+countHashtags	171588
