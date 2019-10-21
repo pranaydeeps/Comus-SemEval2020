@@ -1,0 +1,13 @@
+CLASSIFFICATION REPORT
+        
+        TREES == 45
+                
+        
+        precision    recall  f1-score   support
+ 0.0       0.30      0.10      0.15       451
+ 1.0       0.61      0.89      0.72       866
+ 2.0       0.17      0.03      0.05       113
+ 
+accuracy                            0.57      1430
+macro avg       0.36      0.34      0.31      1430
+weighted avg    0.48      0.57      0.49      1430

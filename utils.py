@@ -71,84 +71,6 @@ def prep_task1(data_list):
     print(task1_list)
     return task1_list
 
-def lex_classifier(pos_words, neg_words, neutral_words, datalist):
-    correct = 0
-    incorrect = 0
-    recognized = 0
-    total_words = 0
-    
-    pos_correct = 0
-    neg_correct = 0
-    pos_incorrect = 0
-    neg_incorrect = 0
-    neutral_correct = 0
-    neutral_incorrect = 0
-
-    nlp = English()
-
-    print('Iterating through dataset')
-    for item in datalist:
-        line = item[1].lower()
-        print(line)
-        linemath = 0
-        actualmath = 0
-        data = line.strip('\n')
-        if data:
-            all_words = word_tokenize(data)
-            #print(all_words)
-            all_words_spacy = nlp(data)
-            #print(all_words_spacy)
-
-            for word in all_words:
-            #for word in all_words_spacy:
-                #if word.text in pos_words:
-                if word in pos_words:
-                    linemath+=1
-                    recognized+=1
-                if word in neg_words:
-                    linemath-=1
-                    recognized+=1
-                if word in neutral_words:
-                    recognized+=1
-
-            total_words += len(all_words)
-            if linemath!=0:
-                linemath = linemath/abs(linemath)
-            if item[2] == 1:
-                if linemath == 1:
-                    correct+=1
-                    pos_correct+=1
-                else:
-                    pos_incorrect+=1       
-                    incorrect+=1
-            if item[2] == 2:
-                if linemath == -1:
-                    correct+=1
-                    neg_correct+=1
-                else:
-                    neg_incorrect+=1
-                    incorrect+=1
-            if item[2] == 0:
-                if linemath == 0:
-                    correct+=1
-                    neutral_correct+=1
-                else:
-                    neutral_incorrect+=1
-                    incorrect+=1
-
-    total = correct + incorrect
-    acc = correct/float(total)
-    print('### LEXICON CLASSIFICATION PROCESSING SUMMARY ###')
-    print('\n ')
-    print('Classification Accuracy: {}/{} = {}'.format(correct, total, acc))
-    print('Words Recognized from Lexicon: {}/{} = {}'.format(recognized, total_words, recognized/float(total_words)))
-    print('##############################################')
-    print('\n')
-    print("Classwise Accuracies:")
-    print("Positive: {}/{} = {}".format(pos_correct, (pos_correct+pos_incorrect), pos_correct/float(pos_correct+pos_incorrect)))
-    print("Negative: {}/{} = {}".format(neg_correct, (neg_correct+neg_incorrect), neg_correct/float(neg_correct+neg_incorrect)))
-    print("Neutral: {}/{} = {}".format(neutral_correct, (neutral_correct+neutral_incorrect), neutral_correct/float(neutral_correct+neutral_incorrect)))
-
 def load_nrc_emotion_lex(lex_path):
 
     with open(lex_path) as f:
@@ -181,6 +103,29 @@ def load_nrc_emotion_lex(lex_path):
     
     return pos_words, neg_words, neutral_words
 
+
+def lex_feature_extractor(pos_words, neg_words, neutral_words, string):
+    print("Speaking from the Lex Feature Extractor. Obtained String: {}".format(string))
+    words = string.split()
+    pos_score = 0.0
+    neg_score = 0.0
+    neutral_score = 0.0
+    total_score = 0
+    for word in words:
+        if word in pos_words:
+            pos_score+=1
+        if word in neg_words:
+            neg_score+=1
+        if word in neutral_words:
+            neutral_score+=1
+
+    total_score = pos_score - neg_score
+    pos_score = pos_score
+    neg_score = neg_score
+    neutral_score = neutral_score
+
+    return [total_score, pos_score, neg_score, neutral_score]
+    
 def createTrainingLists(instanceObjectList):
     '''
     Extracts lists of token ngrams, character ngrams, lemma ngrams, lemma+PoStag ngrams and dependency relations 
@@ -239,6 +184,9 @@ def createFeatureVectors(instanceObjectList, outputFileName, featureIndexFileNam
     The index number(s) for each extracted feature (set) are written to the feature index file (if desired)
     '''
     print ('Creating feature vectors...')
+    pos_words, neg_words, neutral_words = load_nrc_emotion_lex('data/NRC-Emotion-Lexicon-Wordlevel-v0.92.txt')
+    lexiconfeatures = True
+    
     if os.path.isfile(outputFileName):
         open(outputFileName, 'w').close()
     outputFile = codecs.open(outputFileName, 'a', 'utf8')
@@ -323,6 +271,21 @@ def createFeatureVectors(instanceObjectList, outputFileName, featureIndexFileNam
                 featureIndexInfo = 'countHashtags\t%d\n' % (featureIndex)
                 if featureIndexFileName:
                     featureIndexFile.write(featureIndexInfo)
+
+        if lexiconfeatures:
+            print("CHECKING INSTANCES: {}".format(instance.content))
+            if instance.content:
+                lexiconfeature = lex_feature_extractor(pos_words, neg_words, neutral_words, instance.content)
+                featureIndex+=4
+                featureDictionary[featureIndex+1] = lexiconfeature[0]
+                featureDictionary[featureIndex+2] = lexiconfeature[1]
+                featureDictionary[featureIndex+3] = lexiconfeature[2]
+                featureDictionary[featureIndex+4] = lexiconfeature[3]
+
+                if instanceNr == 0:
+                    featureIndexInfo = 'NRC_Lexicon Features\t%d-%d\n' % (featureIndex+1, featureIndex+4)
+                    if featureIndexFileName:
+                        featureIndexFile.write(featureIndexInfo)
         featureVector = str(sentimentLabel) + " " + " ".join("%d:%f" % (key, featureDictionary[key]) for key in sorted(featureDictionary.keys()))
         outputFile.write(featureVector)
         outputFile.write('\n')
@@ -349,7 +312,7 @@ def createInstanceObjectList(processed_dataset):
             content = ' '.join([str(elem) for elem in all_words])
         label = item[2]
         #processed_data.append(tokenized + '\t' + str(label))
-        instanceObject = Instance(tokenized, label)
+        instanceObject = Instance(content, label)
         for i, token in enumerate(content.split()):
             instanceObject.tokenDictionary[i+1] = Token(token)
         if FeatureSelection.getInstance(featureFile).normalizeInstances:
